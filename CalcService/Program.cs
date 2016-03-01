@@ -45,8 +45,26 @@ namespace CalcService
         public static double NovemberSeasonality = double.Parse(ConfigurationSettings.AppSettings.Get("NovemberSeasonality"));
         public static double DecemberSeasonality = double.Parse(ConfigurationSettings.AppSettings.Get("DecemberSeasonality"));
 
+        public static void CalculateMonthOverMonthSeasonality()
+        {
+            FebruarySeasonality = FebruarySeasonality * JanuarySeasonality;
+            MarchSeasonality = MarchSeasonality * FebruarySeasonality;
+            AprilSeasonality = AprilSeasonality * MarchSeasonality;
+            MaySeasonality = MaySeasonality * AprilSeasonality;
+            JuneSeasonality = MaySeasonality * JuneSeasonality;
+            JulySeasonality = JulySeasonality * JuneSeasonality;
+            AugustSeasonality = AugustSeasonality * JulySeasonality;
+            SeptemberSeasonality = SeptemberSeasonality * AugustSeasonality;
+            OctoberSeasonality = OctoberSeasonality * SeptemberSeasonality;
+            NovemberSeasonality = NovemberSeasonality * OctoberSeasonality;
+            DecemberSeasonality = DecemberSeasonality * NovemberSeasonality;
+        }
+
         static void Main(string[] args)
         {
+            if (bool.Parse(ConfigurationSettings.AppSettings.Get("MonthOverMonthSeasonality"))) {
+                CalculateMonthOverMonthSeasonality();
+            }
             Console.WriteLine("Importing Last 12 months of available data:");
             Dictionary<int, SKU> SKUs = new Dictionary<int, SKU>();
             //Take top 12 csv files in folder, ordered from most recent to oldest.
@@ -57,19 +75,31 @@ namespace CalcService
                 int i = 0;
                 DateTime ImportDate = Convert.ToDateTime(file.Name.Substring(0, file.Name.Length - 4));
                 importedDates.Add(ImportDate);
+                Console.WriteLine("Start Read");
                 using (CsvReader csv = new CsvReader(System.IO.File.OpenText(file.FullName)))
                 {
                     while (csv.Read())
                     {
-                        int SKUId = csv.GetField<int>(0);
-                        double SkuTotal = csv.GetField<double>(2);
-                        if (!SKUs.ContainsKey(SKUId))
+                        try
                         {
-                            SKUs.Add(SKUId, new SKU() { Id = SKUId, MonthlyTotals = new List<double>(), Months = new List<DateTime>() });
+                            int SKUId = csv.GetField<int>(0);
+                            double SkuTotal = csv.GetField<double>(2);
+                            if (!SKUs.ContainsKey(SKUId))
+                            {
+                                SKUs.Add(SKUId, new SKU() { Id = SKUId, MonthlyTotals = new List<double>(), Months = new List<DateTime>() });
+                            }
+                            SKUs[SKUId].Months.Add(ImportDate);
+                            SKUs[SKUId].MonthlyTotals.Add(SkuTotal);
+                            i++;
                         }
-                        SKUs[SKUId].Months.Add(ImportDate);
-                        SKUs[SKUId].MonthlyTotals.Add(SkuTotal);
-                        i++;
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                            Console.WriteLine(e.StackTrace);
+                            Console.WriteLine(csv.GetField(0));
+                            Console.WriteLine(csv.GetField(1));
+                            Console.WriteLine(csv.GetField(2));
+                        }                        
                     }
                 }
             }
@@ -109,6 +139,7 @@ namespace CalcService
             ///////////////////////////////////////////////////////////////////////
             //Calc Complete, write out data
             ///////////////////////////////////////////////////////////////////////
+            Console.WriteLine("Writing Calculations to File");
             using (CsvWriter csvOut = new CsvWriter(System.IO.File.CreateText(ConfigurationSettings.AppSettings.Get("OutputFile"))))
             {
                 csvOut.WriteRecords(Forcast);
@@ -139,7 +170,7 @@ namespace CalcService
                 SeasonallyPredictedTotalRounded = (int)Math.Floor(SeasonallyPredictedTotal);
             }
             
-            string SkuClass = GetSkuClass((int)sku.MonthlyTotals.Sum());
+            string SkuClass = GetSkuClass(sku.MonthlyTotals.ToArray());
             
             double GoodnessOfFitVar = GoodnessOfFit.RSquared(ScalarDates.Select(x => Intercept + Slope * x), NormalizedYs); // == 1.0
 
@@ -157,43 +188,73 @@ namespace CalcService
             };
         }
 
-        public static string GetSkuClass(int TotalSales)
+        public static string GetSkuClass(double[] TotalSales)
         {
-            string SkuClass;
-            switch (TotalSales)
+            int TotalMonthsGreaterThanZeroPast12 = 0;
+            int TotalMonthsGreaterThanZeroPast6 = 0;
+            for (int i = 0; i < TotalSales.Length; i++)
             {
-                case 0:
-                case 1:
-                    SkuClass = "A";
-                    break;
-                case 2:
-                case 3:
+                if (TotalSales[i] > 0){
+                    TotalMonthsGreaterThanZeroPast12++;
+                    if (i < 6)
+                    {
+                        TotalMonthsGreaterThanZeroPast6++;
+                    }
+                }                
+            }
+
+            string SkuClass;
+            switch (TotalMonthsGreaterThanZeroPast6)
+            {    
+                case 5:
+                case 4:
                     SkuClass = "B";
                     break;
-                case 4:
-                case 5:
+                case 3:
                     SkuClass = "C";
                     break;
-                case 6:
-                    SkuClass = "D6";
-                    break;
-                case 7:
-                    SkuClass = "D5";
-                    break;
-                case 8:
-                    SkuClass = "D4";
-                    break;
-                case 9:
-                    SkuClass = "D3";
-                    break;
-                case 10:
-                    SkuClass = "D2";
-                    break;
-                case 11:
-                    SkuClass = "D1";
-                    break;
                 default:
-                    SkuClass = "E";
+                    if(TotalMonthsGreaterThanZeroPast6 > 5)
+                    {
+                        SkuClass = "A";
+                        break;
+                    }
+                    switch (TotalMonthsGreaterThanZeroPast12)
+                    {
+                        case 9:
+                            SkuClass = "B";
+                            break;
+                        case 8:
+                        case 7:
+                            SkuClass = "C";
+                            break;
+                        case 6:
+                            SkuClass = "D6";
+                            break;
+                        case 5:
+                            SkuClass = "D5";
+                            break;
+                        case 4:
+                            SkuClass = "D4";
+                            break;
+                        case 3:
+                            SkuClass = "D3";
+                            break;
+                        case 2:
+                            SkuClass = "D2";
+                            break;
+                        case 1:
+                            SkuClass = "D1";
+                            break;
+                        default:
+                            if (TotalMonthsGreaterThanZeroPast12 > 9)
+                            {
+                                SkuClass = "A";
+                                break;
+                            }
+                            SkuClass = "E";
+                            break;
+                    }
                     break;
             }
             return SkuClass;
