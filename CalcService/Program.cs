@@ -7,6 +7,7 @@ using CsvHelper;
 using System.IO;
 using System.Configuration;
 using MathNet.Numerics;
+using MathNet.Numerics.Statistics;
 
 namespace CalcService
 {
@@ -28,6 +29,8 @@ namespace CalcService
         public double Slope { get; set; }
         public double Intercept { get; set; }
         public double GoodnessOfFitRSquare { get; set; }
+        public double StandardDeviation { get; set; }
+        public double ZScore { get; set; }
     }
 
     class Program
@@ -153,7 +156,8 @@ namespace CalcService
         public static SKUPrediction GenerateSkuPreduction(SKU sku, DateTime PredictionDate)
         {
             int Id = sku.Id;
-            double[] NormalizedYs = RemoveSeasonality(sku.Months.Select(o => o.Month).ToArray(), sku.MonthlyTotals.ToArray());
+            double[] YValues = sku.MonthlyTotals.ToArray();
+            double[] NormalizedYs = RemoveSeasonality(sku.Months.Select(o => o.Month).ToArray(), YValues);
             double[] ScalarDates = sku.Months.Select(o => o.ToOADate()).ToArray();
             Tuple<double, double> p = Fit.Line(ScalarDates, NormalizedYs);
             double Slope = p.Item2;
@@ -174,6 +178,10 @@ namespace CalcService
             
             double GoodnessOfFitVar = GoodnessOfFit.RSquared(ScalarDates.Select(x => Intercept + Slope * x), NormalizedYs); // == 1.0
 
+            double StdDev = Statistics.PopulationStandardDeviation(YValues);
+
+            double Zscore = (SeasonallyPredictedTotalRounded - YValues.Average()) / StdDev;
+
             return new SKUPrediction()
             {
                 Id = Id,
@@ -184,7 +192,10 @@ namespace CalcService
                 SeasonallyPredictedTotal = SeasonallyPredictedTotal,
                 SeasonallyPredictedTotalRounded = SeasonallyPredictedTotalRounded,
                 SkuClass = SkuClass,
-                Slope = Slope
+                Slope = Slope,
+                StandardDeviation = StdDev,
+                ZScore = Zscore
+                
             };
         }
 
