@@ -70,9 +70,10 @@ namespace CalcService
             }
             Console.WriteLine("Importing Last 12 months of available data:");
             Dictionary<int, SKU> SKUs = new Dictionary<int, SKU>();
-            //Take top 12 csv files in folder, ordered from most recent to oldest.
+            //Take top 12 csv files in folder, ordered from most recent to oldest. //NumberMonths
             List<DateTime> importedDates = new List<DateTime>();
-            foreach (FileInfo file in new DirectoryInfo(ConfigurationSettings.AppSettings.Get("InputFiles")).GetFiles("*.csv").OrderByDescending(p => p.Name).Take(12).ToArray())
+            int NumberMonths = int.Parse(ConfigurationSettings.AppSettings.Get("NumberMonths"));
+            foreach (FileInfo file in new DirectoryInfo(ConfigurationSettings.AppSettings.Get("InputFiles")).GetFiles("*.csv").OrderByDescending(p => p.Name).Take(NumberMonths).ToArray())
             {
                 Console.WriteLine(file.Name);
                 int i = 0;
