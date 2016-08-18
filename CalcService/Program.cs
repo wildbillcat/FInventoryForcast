@@ -229,23 +229,22 @@ namespace CalcService
                     if(TotalMonthsGreaterThanZeroPast6 > 5)
                     {
                         SkuClass = "A";
-                        int AverageSales = (int)TotalSales.Average();
-                        if (TotalSales.Min() < 3)
+                        if (TotalSales.Median() < 3)
                         {
                             SkuClass = "A1";
-                        }else if(TotalSales.Min() < 10)
+                        }else if(TotalSales.Median() < 10)
                         {
                             SkuClass = "A2";
                         }
-                        else if (TotalSales.Min() < 25)
+                        else if (TotalSales.Median() < 25)
                         {
                             SkuClass = "A3";
                         }
-                        else if (TotalSales.Min() < 50)
+                        else if (TotalSales.Median() < 50)
                         {
                             SkuClass = "A4";
                         }
-                        else if (TotalSales.Min() >= 50)
+                        else if (TotalSales.Median() >= 50)
                         {
                             SkuClass = "A5";
                         }
